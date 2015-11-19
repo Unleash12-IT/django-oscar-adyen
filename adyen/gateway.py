@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import base64
+import binascii
 import hashlib
 import hmac
 import logging
@@ -159,8 +160,9 @@ class Gateway:
         + merchantReturnData
         """
         signature = ''.join(str(params.get(key, '')) for key in keys)
-        hm = hmac.new(self.secret_key.encode(), signature.encode(), hashlib.sha1)
-        hash_ = base64.encodebytes(hm.digest()).strip().decode('utf-8')
+        hmac_key = binascii.a2b_hex(self.secret_key)
+        hm = hmac.new(hmac_key, signature, hashlib.sha256)
+        hash_ = base64.b64encode(hm.digest())
         return hash_
 
     def _build_form_fields(self, adyen_request):
@@ -339,7 +341,7 @@ class PaymentNotification(BaseResponse):
             key: self.params[key]
             for key in self.params if Constants.ADDITIONAL_DATA_PREFIX not in key
         }
-        super().check_fields()
+        super(PaymentNotification, self).check_fields()
 
     def process(self):
         payment_result = self.params.get(Constants.SUCCESS, None)
@@ -378,7 +380,7 @@ class PaymentRedirection(BaseResponse):
     )
 
     def validate(self):
-        super().validate()
+        super(PaymentRedirection, self).validate()
 
         # Check that the transaction has not been tampered with.
         received_hash = self.params.get(self.HASH_FIELD)

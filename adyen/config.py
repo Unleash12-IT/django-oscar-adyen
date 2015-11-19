@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.utils.module_loading import import_string
+from django.utils.module_loading import import_by_path
 
 
 def get_config():
@@ -11,7 +11,7 @@ def get_config():
         config_class_string = settings.ADYEN_CONFIG_CLASS
     except AttributeError:
         config_class_string = 'adyen.settings_config.FromSettingsConfig'
-    return import_string(config_class_string)()
+    return import_by_path(config_class_string)()
 
 
 class AbstractAdyenConfig:
