@@ -1,32 +1,46 @@
 # -*- coding: utf-8 -*-
-from __future__ import unicode_literals
+from south.utils import datetime_utils as datetime
+from south.db import db
+from south.v2 import SchemaMigration
+from django.db import models
 
-from django.db import models, migrations
-import django.utils.timezone
+
+class Migration(SchemaMigration):
+
+    def forwards(self, orm):
+        # Adding model 'AdyenTransaction'
+        db.create_table(u'adyen_adyentransaction', (
+            (u'id', self.gf('django.db.models.fields.AutoField')(primary_key=True)),
+            ('order_number', self.gf('django.db.models.fields.CharField')(max_length=255)),
+            ('reference', self.gf('django.db.models.fields.CharField')(max_length=255)),
+            ('method', self.gf('django.db.models.fields.CharField')(max_length=255, blank=True)),
+            ('status', self.gf('django.db.models.fields.CharField')(max_length=255, blank=True)),
+            ('amount', self.gf('django.db.models.fields.DecimalField')(null=True, max_digits=12, decimal_places=2, blank=True)),
+            ('currency', self.gf('django.db.models.fields.CharField')(default='EUR', max_length=3)),
+            ('ip_address', self.gf('django.db.models.fields.GenericIPAddressField')(max_length=39, null=True, blank=True)),
+            ('date_created', self.gf('django.db.models.fields.DateTimeField')(default=datetime.datetime.now)),
+        ))
+        db.send_create_signal(u'adyen', ['AdyenTransaction'])
 
 
-class Migration(migrations.Migration):
+    def backwards(self, orm):
+        # Deleting model 'AdyenTransaction'
+        db.delete_table(u'adyen_adyentransaction')
 
-    dependencies = [
-    ]
 
-    operations = [
-        migrations.CreateModel(
-            name='AdyenTransaction',
-            fields=[
-                ('id', models.AutoField(primary_key=True, verbose_name='ID', auto_created=True, serialize=False)),
-                ('order_number', models.CharField(db_index=True, max_length=255, unique=True)),
-                ('reference', models.CharField(max_length=255)),
-                ('method', models.CharField(max_length=255, blank=True)),
-                ('status', models.CharField(max_length=255, blank=True)),
-                ('amount', models.DecimalField(max_digits=12, blank=True, decimal_places=2, null=True)),
-                ('currency', models.CharField(max_length=3, default='EUR')),
-                ('ip_address', models.GenericIPAddressField(blank=True, null=True)),
-                ('date_created', models.DateTimeField(default=django.utils.timezone.now)),
-            ],
-            options={
-                'ordering': ('-date_created',),
-            },
-            bases=(models.Model,),
-        ),
-    ]
+    models = {
+        u'adyen.adyentransaction': {
+            'Meta': {'ordering': "('-date_created',)", 'object_name': 'AdyenTransaction'},
+            'amount': ('django.db.models.fields.DecimalField', [], {'null': 'True', 'max_digits': '12', 'decimal_places': '2', 'blank': 'True'}),
+            'currency': ('django.db.models.fields.CharField', [], {'default': "'EUR'", 'max_length': '3'}),
+            'date_created': ('django.db.models.fields.DateTimeField', [], {'default': 'datetime.datetime.now'}),
+            u'id': ('django.db.models.fields.AutoField', [], {'primary_key': 'True'}),
+            'ip_address': ('django.db.models.fields.GenericIPAddressField', [], {'max_length': '39', 'null': 'True', 'blank': 'True'}),
+            'method': ('django.db.models.fields.CharField', [], {'max_length': '255', 'blank': 'True'}),
+            'order_number': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
+            'reference': ('django.db.models.fields.CharField', [], {'max_length': '255'}),
+            'status': ('django.db.models.fields.CharField', [], {'max_length': '255', 'blank': 'True'})
+        }
+    }
+
+    complete_apps = ['adyen']
