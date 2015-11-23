@@ -5,7 +5,7 @@ from .gateway import Constants, MissingFieldException
 from .config import get_config
 
 
-class Scaffold:
+class Scaffold(object):
 
     # These are the constants that all scaffolds are expected to return
     # to a multi-psp application. They might look like those actually returned

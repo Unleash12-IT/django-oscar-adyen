@@ -11,7 +11,7 @@ logger = logging.getLogger('adyen')
 
 # ---[ CONSTANTS ]---
 
-class Constants:
+class Constants(object):
 
     ACCEPTED_NOTIFICATION = '[accepted]'
 
@@ -96,7 +96,7 @@ class InvalidTransactionException(ValueError):
 
 # ---[ GATEWAY ]---
 
-class Gateway:
+class Gateway(object):
 
     MANDATORY_SETTINGS = (
         Constants.IDENTIFIER,
@@ -122,7 +122,7 @@ class Gateway:
                 "Please check your configuration."
             )
 
-    def _compute_hash(self, keys, params):
+    def _compute_hash(self, signature):
         """
         Compute a validation hash for Adyen transactions.
 
@@ -159,7 +159,6 @@ class Gateway:
         authResult + pspReference + merchantReference + skinCode
         + merchantReturnData
         """
-        signature = ''.join(str(params.get(key, '')) for key in keys)
         hmac_key = binascii.a2b_hex(self.secret_key)
         hm = hmac.new(hmac_key, signature, hashlib.sha256)
         hash_ = base64.b64encode(hm.digest())
@@ -181,14 +180,18 @@ class Gateway:
         return adyen_response.process()
 
 
-class BaseInteraction:
+class BaseInteraction(object):
     REQUIRED_FIELDS = ()
     OPTIONAL_FIELDS = ()
     HASH_KEYS = ()
     HASH_FIELD = None
 
+    def _compute_signature(self, keys, params):
+        return ''.join(str(params.get(key, '')) for key in keys)
+
     def hash(self):
-        return self.client._compute_hash(self.HASH_KEYS, self.params)
+        signature = self._compute_signature(self.HASH_KEYS, self.params)
+        return self.client._compute_hash(signature)
 
     def validate(self):
         self.check_fields()
@@ -294,6 +297,14 @@ class BaseResponse(BaseInteraction):
     def process(self):
         return NotImplemented
 
+    def _compute_signature(self, keys, params):
+        """
+        For payment response hash using SHA-256 calculated for string, concatenated from keys and values joined by colon
+        https://docs.adyen.com/display/TD/Payment+Response+merchantSig+-+SHA+256
+        """
+        signature_params = list(keys) + [str(params.get(key, '')) for key in keys]
+        return Constants.SEPARATOR.join(signature_params)
+
 
 class PaymentNotification(BaseResponse):
     """
@@ -322,6 +333,16 @@ class PaymentNotification(BaseResponse):
     OPTIONAL_FIELDS = (
         Constants.OPERATIONS,
         Constants.ORIGINAL_REFERENCE,
+    )
+    HASH_KEYS = (
+        Constants.PSP_REFERENCE,
+        Constants.ORIGINAL_REFERENCE,
+        Constants.MERCHANT_ACCOUNT_CODE,
+        Constants.MERCHANT_REFERENCE,
+        Constants.VALUE,
+        Constants.CURRENCY,
+        Constants.EVENT_CODE,
+        Constants.SUCCESS
     )
 
     def check_fields(self):
@@ -373,10 +394,12 @@ class PaymentRedirection(BaseResponse):
     # Note that the order of the keys matter to compute the hash!
     HASH_KEYS = (
         Constants.AUTH_RESULT,
-        Constants.PSP_REFERENCE,
         Constants.MERCHANT_REFERENCE,
-        Constants.SKIN_CODE,
         Constants.MERCHANT_RETURN_DATA,
+        Constants.PAYMENT_METHOD,
+        Constants.PSP_REFERENCE,
+        Constants.SHOPPER_LOCALE,
+        Constants.SKIN_CODE,
     )
 
     def validate(self):

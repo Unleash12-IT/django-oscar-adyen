@@ -14,7 +14,7 @@ def get_config():
     return import_by_path(config_class_string)()
 
 
-class AbstractAdyenConfig:
+class AbstractAdyenConfig(object):
     """
     The base implementation for a config class.
     """
