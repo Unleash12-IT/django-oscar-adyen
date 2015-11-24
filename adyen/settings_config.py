@@ -41,3 +41,6 @@ class FromSettingsConfig(AbstractAdyenConfig):
             return settings.ADYEN_IP_ADDRESS_HTTP_HEADER
         except AttributeError:
             return 'REMOTE_ADDR'
+
+    def get_source_type(self):
+        getattr(settings, 'ADYEN_SOURCE_TYPE', 'adyen')

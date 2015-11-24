@@ -70,6 +70,7 @@ class Constants(object):
     SHOPPER_STATEMENT = 'shopperStatement'
     SHOPPER_TYPE = 'shopperType'
 
+    SOURCE_TYPE = 'adyen'
     SUCCESS = 'success'
     TEST = 'test'
     TRUE = 'true'
