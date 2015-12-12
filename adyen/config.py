@@ -33,6 +33,3 @@ class AbstractAdyenConfig(object):
 
     def get_ip_address_header(self):
         raise NotImplementedError
-
-    def get_source_type(self):
-        raise NotImplementedError

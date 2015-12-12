@@ -1,18 +1,13 @@
 # -*- coding: utf-8 -*-
-from decimal import Decimal
+
 import iptools
 import logging
 
 from django.http import HttpResponse
 
-from oscar.core.loading import get_model
 from .gateway import Constants, Gateway, PaymentNotification, PaymentRedirection
+from .models import AdyenTransaction
 from .config import get_config
-
-Order = get_model('order', 'Order')
-Source = get_model('payment', 'Source')
-SourceType = get_model('payment', 'SourceType')
-Transaction = get_model('payment', 'Transaction')
 
 logger = logging.getLogger('adyen')
 
@@ -22,7 +17,6 @@ def get_gateway(request, config):
         Constants.IDENTIFIER: config.get_identifier(request),
         Constants.SECRET_KEY: config.get_skin_secret(request),
         Constants.ACTION_URL: config.get_action_url(request),
-        Constants.SOURCE_TYPE: config.get_source_type(),
     })
 
 
@@ -104,31 +98,46 @@ class Facade(object):
         Record an AdyenTransaction to keep track of the current payment attempt.
         """
         reference = txn_details['psp_reference']
-        if not Transaction.objects.filter(reference=reference).exists():
-            source_type, is_created = SourceType.objects.get_or_create(
-                name=Constants.SOURCE_TYPE)
 
-            # We record the audit trail.
+        # We record the audit trail.
+        try:
+            txn_log = AdyenTransaction.objects.create(
+                amount=txn_details['amount'],
+                method=txn_details['payment_method'],
+                order_number=txn_details['order_number'],
+                reference=reference,
+                status=status,
+            )
+        except Exception:  # pylint: disable=W0703
+
+            # Yes, this is generic, because basically, whatever happens, be it
+            # a `KeyError` in `txn_details` or an exception when creating our
+            # `AdyenTransaction`, we are going to do the same thing: log the
+            # exception and carry on. This is not critical, and this should
+            # not prevent the rest of the process.
+            logger.exception("Unable to record audit trail for transaction "
+                             "with reference %s", reference)
+
+        # If we received a PaymentNotification via a POST request, we cannot
+        # accurately record the origin IP address. It will, however, be made
+        # available in the daily Received Payment Report, which we can then
+        # process to reconcile the data (TODO at some point).
+        if request.method == 'POST':
+            return
+
+        # Otherwise, we try to record the origin IP address.
+        ip_address = self._get_origin_ip_address(request)  # None if not found
+        if ip_address is not None:
             try:
-                order = Order.objects.get(number=txn_details['order_number'])
-                source = Source(source_type=source_type,
-                                order=order,
-                                label='%s %s' % (Constants.SOURCE_TYPE, txn_details['payment_method']))
-                source.save()
-                payment_params = {'reference': reference,
-                                  'amount': Decimal(txn_details['amount']) / Decimal(100.0),
-                                  'status': status}
-                # Record transaction
-                source.debit(**payment_params)
-            except Exception:  # pylint: disable=W0703
+                txn_log.ip_address = ip_address
+                txn_log.save()
+            except NameError:
 
-                # Yes, this is generic, because basically, whatever happens, be it
-                # a `KeyError` in `txn_details` or an exception when creating our
-                # `AdyenTransaction`, we are going to do the same thing: log the
-                # exception and carry on. This is not critical, and this should
-                # not prevent the rest of the process.
-                logger.exception("Unable to record audit trail for transaction "
-                                 "with reference %s", reference)
+                # This means txn_log is not defined, which means the audit
+                # trail hasn't been successfully recorded above -- in which
+                # case, we have already informed our users.
+
+                pass
 
     def handle_payment_feedback(self, request):
         """
@@ -158,6 +167,7 @@ class Facade(object):
         # Then, we can extract the received data...
         success, status, details = response.process()
         txn_details = self._unpack_details(details)
+
         # ... and record the audit trail.
         self._record_audit_trail(request, status, txn_details)
 
@@ -222,7 +232,7 @@ class Facade(object):
         # "Duplicate notifications have the same corresponding values for their eventCode and
         # pspReference fields."  https://docs.adyen.com/display/TD/Accept+notifications
         # The event code gets checked above, so we only need to check for the reference now.
-        if Transaction.objects.filter(reference=reference).exists():
+        if AdyenTransaction.objects.filter(reference=reference).exists():
             # We already stored a transaction with this reference, so we can ignore the
             # notification. As above, we still acknowledge it to Adyen, in case it missed
             # our previous acknowledgment.
